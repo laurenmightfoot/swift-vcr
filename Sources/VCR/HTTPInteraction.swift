@@ -18,7 +18,7 @@ public struct RecordedRequest: Codable, Sendable {
     self.method = urlRequest.httpMethod ?? "GET"
     self.url = urlRequest.url?.absoluteString ?? ""
     self.headers = urlRequest.allHTTPHeaderFields ?? [:]
-    self.body = urlRequest.httpBody
+    self.body = urlRequest.data
   }
 }
 
@@ -55,5 +55,30 @@ public struct HTTPInteraction: Codable, Sendable {
     self.request = request
     self.response = response
     self.recordedAt = recordedAt
+  }
+}
+
+extension URLRequest {
+  fileprivate var data: Data? {
+    httpBody ?? httpBodyStream.map { Data(reading: $0, withBufferSize: 1024) }
+  }
+}
+
+extension Data {
+  fileprivate init(reading stream: InputStream, withBufferSize bufferSize: UInt = 1024) {
+    self.init()
+
+    stream.open()
+    defer { stream.close() }
+
+    let bufferSize = Int(bufferSize)
+    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+    defer { buffer.deallocate() }
+
+    while stream.hasBytesAvailable {
+      let read = stream.read(buffer, maxLength: bufferSize)
+      guard read > 0 else { return }
+      self.append(buffer, count: read)
+    }
   }
 }

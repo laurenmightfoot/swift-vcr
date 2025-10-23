@@ -70,7 +70,7 @@ public final class Cassette: Codable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case name
     case interactions
-    case recordMode = "record_mode"
+    case recordMode
     case matcher
   }
 

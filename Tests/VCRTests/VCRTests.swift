@@ -138,7 +138,8 @@ struct VCRTests {
     // Add an interaction
     cassetteOnce.recordInteraction(
       HTTPInteraction(
-        request: RecordedRequest(method: "GET", url: "https://example.com", headers: [:], body: nil),
+        request: RecordedRequest(
+          method: "GET", url: "https://example.com", headers: [:], body: nil),
         response: RecordedResponse(statusCode: 200, headers: [:], body: nil)
       ))
 
@@ -149,7 +150,8 @@ struct VCRTests {
     let cassetteNewEpisodes = Cassette(name: "test", recordMode: .newEpisodes)
     cassetteNewEpisodes.recordInteraction(
       HTTPInteraction(
-        request: RecordedRequest(method: "GET", url: "https://example.com", headers: [:], body: nil),
+        request: RecordedRequest(
+          method: "GET", url: "https://example.com", headers: [:], body: nil),
         response: RecordedResponse(statusCode: 200, headers: [:], body: nil)
       ))
 
@@ -281,5 +283,65 @@ struct VCRTests {
 
     // Clean up
     try? FileManager.default.removeItem(at: tempDir)
+  }
+
+  @Test
+  func recordAndReplayCassetteWithBinaryResponse() async throws {
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vcr_tests_binary_response")
+      .appendingPathComponent(UUID().uuidString)
+
+    try? FileManager.default.removeItem(at: tempDir)
+
+    VCR.shared.configure(
+      VCRConfiguration(
+        cassetteLibraryDirectory: tempDir,
+        defaultRecordMode: .all
+      ))
+
+    let cassetteName = "test_binary_response"
+    let session = VCR.urlSession()
+
+    try await VCR.shared.useCassette(cassetteName, recordMode: .all) {
+      let url = URL(string: "https://httpbin.org/image/jpeg")!
+      let (data, response) = try await session.data(from: url)
+
+      #expect(response is HTTPURLResponse)
+      let statusCode = (response as! HTTPURLResponse).statusCode
+      #expect(statusCode == 200)
+      #expect(data.count > 0)
+    }
+  }
+
+  @Test
+  func recordAndReplayCassetteWithBinaryRequestBody() async throws {
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vcr_tests_binary_request")
+      .appendingPathComponent(UUID().uuidString)
+
+    try? FileManager.default.removeItem(at: tempDir)
+
+    VCR.shared.configure(
+      VCRConfiguration(
+        cassetteLibraryDirectory: tempDir,
+        defaultRecordMode: .all
+      ))
+
+    let cassetteName = "test_binary_request_body"
+    let session = VCR.urlSession()
+
+    try await VCR.shared.useCassette(cassetteName, recordMode: .all) {
+      let url = URL(string: "https://httpbin.org/post")!
+      var request = URLRequest(url: url)
+      request.httpMethod = "POST"
+      request.httpBody = Data("Hello, world!".utf8)
+      let (data, response) = try await session.data(for: request)
+
+      #expect(response is HTTPURLResponse)
+      let statusCode = (response as! HTTPURLResponse).statusCode
+      #expect(statusCode == 200)
+      #expect(data.count > 0)
+    }
+
   }
 }
