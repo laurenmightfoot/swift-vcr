@@ -4,13 +4,13 @@ A Swift port of the popular [VCR](https://github.com/vcr/vcr) Ruby gem. Record y
 
 ## Features
 
-- 📼 **Record & Replay**: Automatically record HTTP interactions and replay them in subsequent test runs
-- 🎯 **URLSession Support**: Works seamlessly with Foundation's URLSession
-- 🔄 **Multiple Record Modes**: Control when and how interactions are recorded
-- 🎨 **Flexible Matching**: Match requests by method, URI, headers, or body
-- 💾 **JSON Storage**: Human-readable cassette files in JSON format
-- 🔒 **Thread-Safe**: Built with Swift concurrency in mind
-- ⚡️ **Swift 6 Ready**: Fully compatible with Swift 6 and modern concurrency
+- **Record & Replay**: Automatically record HTTP interactions and replay them in subsequent test runs
+- **URLSession Support**: Works seamlessly with Foundation's URLSession
+- **Multiple Record Modes**: Control when and how interactions are recorded
+- **Flexible Matching**: Match requests by method, URI, headers, or body
+- **JSON Storage**: Human-readable cassette files in JSON format
+- **Thread-Safe**: Built with Swift concurrency in mind
+- **Swift 6 Ready**: Fully compatible with Swift 6 and modern concurrency
 
 ## Installation
 
