@@ -14,16 +14,22 @@ public final class VCR: @unchecked Sendable {
 
   /// Configure VCR with the given configuration
   public func configure(_ configuration: VCRConfiguration) {
-    // Eject any current cassette when reconfiguring (must be done before locking)
-    if currentCassette != nil {
-      try? ejectCassette()
-    }
-
     lock.lock()
-    defer { lock.unlock() }
+
+    // Force eject any current cassette when reconfiguring
+    if let cassette = _currentCassette {
+      lock.unlock()
+      if let config = _configuration {
+        try? saveCassette(cassette, to: config.cassetteLibraryDirectory)
+      }
+      lock.lock()
+      _currentCassette = nil
+    }
 
     _configuration = configuration
     registerURLProtocol()
+
+    lock.unlock()
   }
 
   /// Get current configuration

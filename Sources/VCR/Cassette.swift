@@ -55,8 +55,10 @@ public final class Cassette: Codable, Sendable {
     case .none:
       return false
     case .once:
-      return !hasMatch
+      // Only record if cassette is completely empty (first run)
+      return interactions.isEmpty
     case .newEpisodes:
+      // Record if this specific request has no match
       return !hasMatch
     case .all:
       return true

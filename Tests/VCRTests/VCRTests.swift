@@ -8,6 +8,9 @@ struct VCRTests {
 
   @Test("Record and replay HTTP interaction")
   func testRecordAndReplay() async throws {
+    // Ensure clean state
+    try? VCR.shared.ejectCassette()
+
     // Configure VCR
     let tempDir = FileManager.default.temporaryDirectory
       .appendingPathComponent("vcr_tests")
@@ -126,13 +129,33 @@ struct VCRTests {
 
   @Test("Record mode behavior")
   func testRecordModeBehavior() {
-    let cassette = Cassette(name: "test", recordMode: .once)
+    let cassetteOnce = Cassette(name: "test", recordMode: .once)
 
-    // Should record when no match
-    #expect(cassette.shouldRecord(hasMatch: false) == true)
+    // Empty cassette: should record
+    #expect(cassetteOnce.shouldRecord(hasMatch: false) == true)
+    #expect(cassetteOnce.shouldRecord(hasMatch: true) == true)
 
-    // Should not record when match exists
-    #expect(cassette.shouldRecord(hasMatch: true) == false)
+    // Add an interaction
+    cassetteOnce.recordInteraction(
+      HTTPInteraction(
+        request: RecordedRequest(method: "GET", url: "https://example.com", headers: [:], body: nil),
+        response: RecordedResponse(statusCode: 200, headers: [:], body: nil)
+      ))
+
+    // Non-empty cassette: should never record (even if no match)
+    #expect(cassetteOnce.shouldRecord(hasMatch: false) == false)
+    #expect(cassetteOnce.shouldRecord(hasMatch: true) == false)
+
+    let cassetteNewEpisodes = Cassette(name: "test", recordMode: .newEpisodes)
+    cassetteNewEpisodes.recordInteraction(
+      HTTPInteraction(
+        request: RecordedRequest(method: "GET", url: "https://example.com", headers: [:], body: nil),
+        response: RecordedResponse(statusCode: 200, headers: [:], body: nil)
+      ))
+
+    // newEpisodes: record if no match, don't record if match
+    #expect(cassetteNewEpisodes.shouldRecord(hasMatch: false) == true)
+    #expect(cassetteNewEpisodes.shouldRecord(hasMatch: true) == false)
 
     let cassetteAll = Cassette(name: "test", recordMode: .all)
 
@@ -145,6 +168,63 @@ struct VCRTests {
     // Should never record
     #expect(cassetteNone.shouldRecord(hasMatch: false) == false)
     #expect(cassetteNone.shouldRecord(hasMatch: true) == false)
+  }
+
+  @Test("Once mode rejects new interactions after first recording")
+  func testOnceModePreventsNewRecordings() async throws {
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vcr_tests_once_mode")
+      .appendingPathComponent(UUID().uuidString)
+
+    try? FileManager.default.removeItem(at: tempDir)
+
+    VCR.shared.configure(
+      VCRConfiguration(
+        cassetteLibraryDirectory: tempDir,
+        defaultRecordMode: .once
+      ))
+
+    let cassetteName = "test_once_mode"
+    let session = VCR.urlSession()
+
+    // First interaction - should record
+    try await VCR.shared.useCassette(cassetteName, recordMode: .once) {
+      var request = URLRequest(url: URL(string: "https://httpbin.org/get?test=1")!)
+      request.httpMethod = "GET"
+      let (_, _) = try await session.data(for: request)
+    }
+
+    // Verify cassette was saved with 1 interaction
+    try VCR.shared.insertCassette(cassetteName)
+    #expect(VCR.shared.currentCassette?.interactions.count == 1)
+    try VCR.shared.ejectCassette()
+
+    // Second interaction with DIFFERENT URL - should fail (not record)
+    var didCatchError = false
+    do {
+      try await VCR.shared.useCassette(cassetteName, recordMode: .once) {
+        var request = URLRequest(url: URL(string: "https://httpbin.org/get?test=2")!)
+        request.httpMethod = "GET"
+        let (_, _) = try await session.data(for: request)
+      }
+    } catch {
+      // Should throw an error (VCRError wrapped by URLSession)
+      didCatchError = true
+      let errorDescription = error.localizedDescription
+      // Verify it's a VCRError about no matching interaction
+      #expect(
+        errorDescription.contains("No matching interaction")
+          || (error as NSError).domain == "VCR.VCRError")
+    }
+    #expect(didCatchError, "Expected error to be thrown for non-matching URL")
+
+    // Verify cassette still has only 1 interaction (didn't record the second)
+    try VCR.shared.insertCassette(cassetteName)
+    #expect(VCR.shared.currentCassette?.interactions.count == 1)
+    try VCR.shared.ejectCassette()
+
+    // Clean up
+    try? FileManager.default.removeItem(at: tempDir)
   }
 
   @Test("Cassette file persistence")
